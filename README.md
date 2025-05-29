@@ -85,6 +85,8 @@ conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 -c pytorch
 
 在`model_pool.py`里面实现了多线程的模型参数i/o。大概意思是通过一个不同线程间共享的ShareableMemory来储存模型参数，然后用不同线程间共享的ShareableList来储存模型的元数据（第几个模型，它的参数存在ShareblaMemory的什么内存地址里）。
 
+具体的做法是`learner.py`里面不断学习，并将学到的最新的模型参数保存到`model_pool.py`的`ModelPoolServer`里。然后在`actor.py`里面需要与麻将环境交互以获得轨迹数据的时候，利用`model_pool.py`的`ModelPoolClient`来链接到`ModelPoolServer`，然后从里面取保存的最新的模型参数来仿真交互，获得对局数据。
+
 ### 问题
 
 1. 当前麻将的局面`observation`究竟是怎么表示的？
