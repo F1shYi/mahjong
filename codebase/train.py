@@ -8,7 +8,7 @@ if __name__ == '__main__':
         'replay_buffer_episode': 400,
         'model_pool_size': 20,
         'model_pool_name': 'model-pool',
-        'num_actors': 24,
+        'num_actors': 5,
         'episodes_per_actor': 1000,
         'gamma': 0.98,
         'lambda': 0.95,
@@ -20,8 +20,8 @@ if __name__ == '__main__':
         'value_coeff': 1,
         'entropy_coeff': 0.01,
         'device': 'cuda',
-        'ckpt_save_interval': 300,
-        'ckpt_save_path': '/model/'
+        'ckpt_save_interval': 100,
+        'ckpt_save_path': 'model/'
     }
     
     replay_buffer = ReplayBuffer(config['replay_buffer_size'], config['replay_buffer_episode'])
