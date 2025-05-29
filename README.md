@@ -38,6 +38,8 @@ conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 -c pytorch
 
 ## 代码库介绍
 
+### 与botzone的交互逻辑和格式
+
 让我们假设现在有一个模型`model`，能够以当前的麻将局面`observation`，在当前局面下合法的动作`mask`为输入，输出一个动作`action`。
 
 - 当前麻将的局面如何用变量`observation`刻画？
@@ -76,6 +78,12 @@ conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 -c pytorch
 - 如果当前的局面`obs`需要模型行动，则如何将`obs`转换成`response`?
   
   具体的逻辑在`__main__.py`的`obs2response`函数里，这个函数以训好的模型`model`和`obs`作为输入，首先用`model(obs["observation"], obs["mask"]`输出一个`action`，再用`codebase/feature.py`中`FeatureAgent`的`action2response`函数把235维的向量`action`转换成符合botzone格式要求的`response`。
+
+### 模型训练
+
+#### 多线程处理
+
+在`model_pool.py`里面实现了多线程的模型参数i/o。大概意思是通过一个不同线程间共享的ShareableMemory来储存模型参数，然后用不同线程间共享的ShareableList来储存模型的元数据（第几个模型，它的参数存在ShareblaMemory的什么内存地址里）。
 
 ### 问题
 
