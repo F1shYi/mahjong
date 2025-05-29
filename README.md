@@ -15,8 +15,8 @@
 - 2025-05-29
   新建了文件夹。
 - 2025-06-04 TODOs
-  1. 理解了`codebase/`的所有代码
-  2. 理解了与botzone的交互逻辑。
+  1. 理解`codebase/`的所有代码
+  2. 理解与botzone的交互逻辑。
   3. 知道应该修改哪里。
 
 ## 环境配置
@@ -41,9 +41,11 @@ conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 -c pytorch
 让我们假设现在有一个模型`model`，能够以当前的麻将局面`observation`，在当前局面下合法的动作`mask`为输入，输出一个动作`action`。
 
 - 当前麻将的局面如何用变量`observation`刻画？
+  
   没搞懂。`codebase/feature.py`中`FeatureAgent`的注释里面说这是一个shape为`[6,4,9]`的东西，但是每个维度分别表示什么没看懂。
 
 - `action`是什么维度的？代表什么？
+
   模型可以选择：
   - 胡牌 1
   - 过（不是自己的回合的时候） 1
@@ -51,15 +53,17 @@ conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 -c pytorch
   - 吃上家的牌 （上家打出的某张牌跟你手中的任意两张牌，能够构成三张连续的牌，如345万，789条等，就可以选择吃；对于吃后的结果，有（123-789）\*（万/筒/条）共7\*3种结果，而在每种结果里，来自上家的牌有三种可能，所以共有7\*3\*3=63种选择）
   - 碰牌 34
   - 杠牌 34*3（明杠，暗杠，补杠）
+  
   共计235种选择，以一个235维的向量来表示。见`codebase/feature.py`中`FeatureAgent`的注释。同时注意，在每个回合，不是所有的动作都是合法的，所以模型还要接收一个`mask`向量（也是235维）作为输入，取值为1/0表示动作是否合法。 
 
-总之这个模型能够输入`observation`，输出`action`。
+总之先假设我们有一个模型能够输入`observation`和`mask`，输出`action`。
 
 假设这个模型`model`已经训好了，如何跟botzone交互？
 
 跟botzone的交互逻辑实现在`__main__.py`里。20-23行先加载这个模型。然后用一个`while`循环重复读取来自botzone的信息`request`，具体的格式见[这个链接](https://wiki.botzone.org.cn/index.php?title=Chinese-Standard-Mahjong#.E8.BE.93.E5.85.A5request)。根据botzone给的`request`，先转换成观察`obs`，然后如果这个回合需要模型行动，则再将观察`obs`转换成行动`response`，并将`response`以botzone需要的输出格式print出来。
 
 - 如何将`request`转换成`obs`?
+  
   具体的逻辑实现在了`codebase/feature.py`中`FeatureAgent`的`request2obs`函数里，我还没细看，大概意思就是把那一堆表示谁摸什么牌了/谁出什么牌了/谁吃碰杠了等等等的字符串转换成当前的局面`observation`和在这个局面下有哪些合法动作`mask`。以字典的形式返回，即
 
   ```python
@@ -70,6 +74,7 @@ conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 -c pytorch
   ```
 
 - 如果当前的局面`obs`需要模型行动，则如何将`obs`转换成`response`?
+  
   具体的逻辑在`__main__.py`的`obs2response`函数里，这个函数以训好的模型`model`和`obs`作为输入，首先用`model(obs["observation"], obs["mask"]`输出一个`action`，再用`codebase/feature.py`中`FeatureAgent`的`action2response`函数把235维的向量`action`转换成符合botzone格式要求的`response`。
 
 ### 问题
