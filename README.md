@@ -86,16 +86,6 @@ conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 -c pytorch
   具体的逻辑在`__main__.py`的`obs2response`函数里，这个函数以训好的模型`model`和`obs`作为输入，首先用`model(obs["observation"], obs["mask"]`输出一个`action`，再用`codebase/feature.py`中`FeatureAgent`的`action2response`函数把235维的向量`action`转换成符合botzone格式要求的`response`。
 
 ### 模型训练
-在`train.py`里实现了模型的训练。主要是通过自我对弈的方式生成训练数据，然后用这些数据来训练模型。具体的做法就是以下`多线程处理`的部分。
-首先要说明的是，模型在learner和actor之间是共享的。模型是在`learner.py`里训练的，而在`actor.py`里使用的，也就是actor会按照最新的模型参数来与麻将环境交互，所收集的轨迹数据会被learner用来训练模型，对模型参数进行优化更新。
-
-在`model.py`里实现了一个卷积神经网络模型。_tower：卷积特征提取器，将图像输入转为特征向量。_logits：Actor 分支，输出每个动作的 logit 值。_value_branch：Critic 分支，输出当前状态的价值估计。
-
-其中，使用`torch.clamp(torch.log(mask), -1e38, 1e38)`来处理mask。这个操作的目的是将mask中的0值转换为一个非常小的负数（-1e38），以避免在计算log时出现无穷大或NaN的情况。具体来说，mask是一个二进制向量，表示哪些动作是合法的（1）或不合法的（0）。通过对mask取对数，我们可以将合法动作的logit值保留，而将不合法动作的logit值设置为一个极小的值，从而在softmax计算中不会影响结果。
-```python
-inf_mask = torch.clamp(torch.log(mask), -1e38, 1e38)
-masked_logits = logits + inf_mask
-```
 
 #### 多线程处理
 

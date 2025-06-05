@@ -7,26 +7,24 @@ from torch.nn import functional as F
 from replay_buffer import ReplayBuffer
 from model_pool import ModelPoolServer
 from model import CNNModel
-import os
+
 class Learner(Process):
     
     def __init__(self, config, replay_buffer):
         super(Learner, self).__init__()
         self.replay_buffer = replay_buffer
         self.config = config
-        self.model_pool = ModelPoolServer(self.config['model_pool_size'], self.config['model_pool_name'])
-    def cleanup(self):
-        self.model_pool.cleanup()
+    
     def run(self):
         # create model pool
-        # self.model_pool = ModelPoolServer(self.config['model_pool_size'], self.config['model_pool_name'])
-
+        model_pool = ModelPoolServer(self.config['model_pool_size'], self.config['model_pool_name'])
+        
         # initialize model params
         device = torch.device(self.config['device'])
-        model = CNNModel().to("cpu")  # create model on CPU first
+        model = CNNModel()
         
         # send to model pool
-        self.model_pool.push(model.state_dict()) # push cpu-only tensor to model_pool
+        model_pool.push(model.state_dict()) # push cpu-only tensor to model_pool
         model = model.to(device)
         
         # training
@@ -41,8 +39,8 @@ class Learner(Process):
         while True:
             # sample batch
             batch = self.replay_buffer.sample(self.config['batch_size'])
-            obs = torch.tensor(batch['state']['observation']).float().to(device)
-            mask = torch.tensor(batch['state']['action_mask']).float().to(device)
+            obs = torch.tensor(batch['state']['observation']).to(device)
+            mask = torch.tensor(batch['state']['action_mask']).to(device)
             states = {
                 'observation': obs,
                 'action_mask': mask
@@ -50,7 +48,7 @@ class Learner(Process):
             actions = torch.tensor(batch['action']).unsqueeze(-1).to(device)
             advs = torch.tensor(batch['adv']).to(device)
             targets = torch.tensor(batch['target']).to(device)
-
+            
             print('Iteration %d, replay buffer in %d out %d' % (iterations, self.replay_buffer.stats['sample_in'], self.replay_buffer.stats['sample_out']))
             
             # calculate PPO loss
@@ -76,14 +74,13 @@ class Learner(Process):
 
             # push new model
             model = model.to('cpu')
-            self.model_pool.push(model.state_dict()) # push cpu-only tensor to model_pool
+            model_pool.push(model.state_dict()) # push cpu-only tensor to model_pool
             model = model.to(device)
             
             # save checkpoints
             t = time.time()
             if t - cur_time > self.config['ckpt_save_interval']:
                 path = self.config['ckpt_save_path'] + 'model_%d.pt' % iterations
-                os.makedirs(self.config['ckpt_save_path'], exist_ok = True)
                 torch.save(model.state_dict(), path)
                 cur_time = t
             iterations += 1

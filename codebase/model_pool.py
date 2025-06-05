@@ -11,62 +11,26 @@ class ModelPoolServer:
         # shared_model_list: N metadata {id, _addr} + n
         metadata_size = 1024
         self.shared_model_list = ShareableList([' ' * metadata_size] * capacity + [self.n], name = name)
-    def cleanup(self):
-        for m in self.model_list:
-            if m and 'memory' in m:
-                try:
-                    m['memory'].close()
-                    m['memory'].unlink()
-                except Exception:
-                    pass
+        
     def push(self, state_dict, metadata = {}):
         n = self.n % self.capacity
         if self.model_list[n]:
-            old_mem = self.model_list[n].get('memory')
-            if old_mem:
-                try:
-                    old_mem.close()
-                    old_mem.unlink()
-                except FileNotFoundError:
-                    pass  # 可能已被別的進程釋放
-                except Exception as e:
-                    print(f"[Warning] Failed to cleanup memory: {e}")
+            # FIFO: release shared memory of older model
+            self.model_list[n]['memory'].unlink()
         
-        # data = cPickle.dumps(state_dict) # model parameters serialized to bytes
-        # name = 'model-%d' % self.n
-        # memory = SharedMemory(create = True, size = len(data), name = name)
-        # # print(memory.buf.dtype)
-        # # print(data.dtype)
-        # # memory.buf[:] = data[:]
-        # memory.buf[:len(data)] = data
-        # # print('Created model', self.n, 'in shared memory', memory.name)
+        data = cPickle.dumps(state_dict) # model parameters serialized to bytes
+        memory = SharedMemory(create = True, size = len(data))
+        memory.buf[:] = data[:]
+        # print('Created model', self.n, 'in shared memory', memory.name)
         
-        # metadata = metadata.copy()
-        # metadata['_addr'] = memory.name
-        # metadata['id'] = self.n
-        # self.model_list[n] = metadata
-        # self.shared_model_list[n] = cPickle.dumps(metadata)
-        # self.n += 1
-        # self.shared_model_list[-1] = self.n
-        # metadata['memory'] = memory
-        data = cPickle.dumps(state_dict)
-        name = f'model-{self.n}'
-        try:
-            memory = SharedMemory(create=True, size=len(data), name=name)
-            memory.buf[:len(data)] = data
-
-            metadata = metadata.copy()
-            metadata['_addr'] = memory.name
-            metadata['id'] = self.n
-            metadata['memory'] = memory
-
-            self.model_list[n] = metadata
-            self.shared_model_list[n] = cPickle.dumps(metadata)
-            self.n += 1
-            self.shared_model_list[-1] = self.n
-
-        except Exception as e:
-            print(f"[Error] Failed to create shared memory: {e}")
+        metadata = metadata.copy()
+        metadata['_addr'] = memory.name
+        metadata['id'] = self.n
+        self.model_list[n] = metadata
+        self.shared_model_list[n] = cPickle.dumps(metadata)
+        self.n += 1
+        self.shared_model_list[-1] = self.n
+        metadata['memory'] = memory
 
 class ModelPoolClient:
     
