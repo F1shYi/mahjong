@@ -1,7 +1,7 @@
 from replay_buffer import ReplayBuffer
 from actor import Actor
 from learner import Learner
-
+import atexit
 if __name__ == '__main__':
     config = {
         'replay_buffer_size': 50000,
@@ -19,7 +19,7 @@ if __name__ == '__main__':
         'lr': 1e-4,
         'value_coeff': 1,
         'entropy_coeff': 0.01,
-        'device': 'cuda',
+        'device': 'mps',
         'ckpt_save_interval': 100,
         'ckpt_save_path': 'model/'
     }
@@ -32,9 +32,11 @@ if __name__ == '__main__':
         actor = Actor(config, replay_buffer)
         actors.append(actor)
     learner = Learner(config, replay_buffer)
+    atexit.register(learner.cleanup)
     
     for actor in actors: actor.start()
     learner.start()
     
     for actor in actors: actor.join()
     learner.terminate()
+    
