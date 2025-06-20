@@ -2,6 +2,16 @@
 
 陈瑜 李泽铭 易小鱼
 
+## 更新日志
+
+### 0620
+增加了测试代码，将训练到一半的模型进行若干次模拟对局，统计分出了赢家的对局，没分出赢家的对局，发生错误的对局，三者分别的占比。
+统计每局的长度，并求平均的对局长度（求的时候将发生错误的对局排除在外）。
+
+增加了logger，记录训练时的loss, PPO ratio; 每次保存模型的时候进行测试，并记录has winner rate, no winner rate, error rate和average episode length.
+
+将learner的计时方式由记录绝对的秒数改为记录训练的轮次iteration数，并每log_interval个iteration记录训练指标，每ckpt_save_interval个iteration保存模型，每eval_interval个iteration进行测试，记录测试指标。
+
 ## 项目结构
 
 - `codebase/`文件夹
@@ -101,6 +111,12 @@ masked_logits = logits + inf_mask
 在`model_pool.py`里面实现了多线程的模型参数i/o。大概意思是通过一个不同线程间共享的ShareableMemory来储存模型参数，然后用不同线程间共享的ShareableList来储存模型的元数据（第几个模型，它的参数存在ShareblaMemory的什么内存地址里）。
 
 具体的做法是`learner.py`里面不断学习，并将学到的最新的模型参数保存到`model_pool.py`的`ModelPoolServer`里。然后在`actor.py`里面需要与麻将环境交互以获得轨迹数据的时候，利用`model_pool.py`的`ModelPoolClient`来链接到`ModelPoolServer`，然后从里面取保存的最新的模型参数来仿真交互，获得对局数据。
+
+
+### 环境更新
+
+他的replay buffer：
+
 
 ### 问题
 

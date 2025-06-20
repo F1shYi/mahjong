@@ -1,4 +1,5 @@
 # Agent part
+import sys
 from feature import FeatureAgent
 
 # Model part
@@ -8,23 +9,26 @@ from model import CNNModel
 import numpy as np
 import torch
 
+
 def obs2response(model, obs):
-    logits, value = model({'observation': torch.from_numpy(np.expand_dims(obs['observation'], 0)), 'action_mask': torch.from_numpy(np.expand_dims(obs['action_mask'], 0))})
+    logits, value = model({'observation': torch.from_numpy(np.expand_dims(
+        obs['observation'], 0)), 'action_mask': torch.from_numpy(np.expand_dims(obs['action_mask'], 0))})
     action = logits.detach().numpy().flatten().argmax()
     response = agent.action2response(action)
     return response
 
-import sys
 
 if __name__ == '__main__':
     model = CNNModel()
-    data_dir = '/data/testrl.pt'
-    model.load_state_dict(torch.load(data_dir, map_location = torch.device('cpu')))
+    data_dir = 'model/model_34267.pt'
+    model.load_state_dict(torch.load(
+        data_dir, map_location=torch.device('cpu')))
     model.train(False)
-    input() # 1
+    input()  # 1
     while True:
         request = input()
-        while not request.strip(): request = input()
+        while not request.strip():
+            request = input()
         request = request.split()
         if request[0] == '0':
             seatWind = int(request[1])
@@ -62,7 +66,8 @@ if __name__ == '__main__':
                     agent.request2obs('Player %d Gang' % p)
                 print('PASS')
             elif request[2] == 'BUGANG':
-                obs = agent.request2obs('Player %d BuGang %s' % (p, request[3]))
+                obs = agent.request2obs(
+                    'Player %d BuGang %s' % (p, request[3]))
                 if p == seatWind:
                     print('PASS')
                 else:
@@ -91,9 +96,12 @@ if __name__ == '__main__':
                         print('GANG')
                         angang = None
                     elif response[0] in ('Peng', 'Chi'):
-                        obs = agent.request2obs('Player %d '% seatWind + ' '.join(response))
+                        obs = agent.request2obs(
+                            'Player %d ' % seatWind + ' '.join(response))
                         response2 = obs2response(model, obs)
-                        print(' '.join([response[0].upper(), *response[1:], response2.split()[-1]]))
-                        agent.request2obs('Player %d Un' % seatWind + ' '.join(response))
+                        print(
+                            ' '.join([response[0].upper(), *response[1:], response2.split()[-1]]))
+                        agent.request2obs('Player %d Un' %
+                                          seatWind + ' '.join(response))
         print('>>>BOTZONE_REQUEST_KEEP_RUNNING<<<')
         sys.stdout.flush()
