@@ -10,6 +10,7 @@ from model import CNNModel
 from env import ERROR, HASWINNER, NOWINNER, MahjongGBEnv
 from feature import FeatureAgent
 from torch.utils.tensorboard.writer import SummaryWriter
+from config import Config
 
 
 def eval_one_episode(model: CNNModel, env: MahjongGBEnv):
@@ -73,12 +74,23 @@ def eval(model, env: MahjongGBEnv, episodes=100):
 
 class Learner(Process):
 
-    def __init__(self, config, replay_buffer):
+    def __init__(self, config: Config, replay_buffer: ReplayBuffer):
 
         super(Learner, self).__init__()
         self.replay_buffer = replay_buffer
         self.config = config
-        self.output_dir = self.config['output_path']
+        self.setup_output_dirs()
+        self.reset_metrics()
+
+        from multiprocessing import Value
+        self.iteration = Value('i', 0)
+
+    def get_iteration(self):
+        with self.iteration.get_lock():
+            return self.iteration.value
+
+    def setup_output_dirs(self):
+        self.output_dir = self.config.output_path
         os.makedirs(self.output_dir, exist_ok=True)
         self.timestamp = time.strftime("%Y%m%d-%H%M%S")
         self.output_dir = os.path.join(self.output_dir, self.timestamp)
@@ -87,7 +99,9 @@ class Learner(Process):
         os.makedirs(self.model_dir, exist_ok=True)
         self.log_dir = os.path.join(self.output_dir, 'log')
         os.makedirs(self.log_dir, exist_ok=True)
-        self.reset_metrics()
+        import json
+        with open(os.path.join(self.output_dir, 'config.json'), 'w') as f:
+            json.dump(self.config.__dict__, f, indent=2)
 
     def reset_metrics(self):
         self.total_loss = 0
@@ -97,18 +111,18 @@ class Learner(Process):
         self.mean_ratio = 0
         self.count = 0
 
-    def log_metrics(self, iterations):
+    def log_metrics(self, iteration):
         if self.count > 0:
             self.writer.add_scalar(
-                'Loss/total', self.total_loss / self.count, iterations)
+                'Loss/total', self.total_loss / self.count, iteration)
             self.writer.add_scalar(
-                'Loss/policy', self.policy_loss / self.count, iterations)
+                'Loss/policy', self.policy_loss / self.count, iteration)
             self.writer.add_scalar(
-                'Loss/value', self.value_loss / self.count, iterations)
+                'Loss/value', self.value_loss / self.count, iteration)
             self.writer.add_scalar(
-                'Loss/entropy', self.entropy_loss / self.count, iterations)
+                'Loss/entropy', self.entropy_loss / self.count, iteration)
             self.writer.add_scalar(
-                'PPO/mean_ratio', self.mean_ratio / self.count, iterations)
+                'PPO/mean_ratio', self.mean_ratio / self.count, iteration)
         self.reset_metrics()
 
     def run(self):
@@ -116,10 +130,10 @@ class Learner(Process):
 
         # create model pool
         model_pool = ModelPoolServer(
-            self.config['model_pool_size'], self.config['model_pool_name'])
+            self.config.model_pool_size, self.config.model_pool_name)
 
         # initialize model params
-        device = torch.device(self.config['device'])
+        device = torch.device(self.config.device)
         model = CNNModel()
 
         # send to model pool
@@ -128,16 +142,15 @@ class Learner(Process):
         model = model.to(device)
 
         # training
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.config['lr'])
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.config.lr)
 
         # wait for initial samples
-        while self.replay_buffer.size() < self.config['min_sample']:
+        while self.replay_buffer.size() < self.config.min_sample:
             time.sleep(0.1)
 
-        iterations = 0
-        while True:
+        while self.get_iteration() < self.config.max_iterations:
             # sample batch
-            batch = self.replay_buffer.sample(self.config['batch_size'])
+            batch = self.replay_buffer.sample(self.config.batch_size)
             obs = torch.tensor(batch['state']['observation']).to(device)
             mask = torch.tensor(batch['state']['action_mask']).to(device)
             states = {
@@ -156,7 +169,7 @@ class Learner(Process):
             old_logits, _ = model(states)
             old_probs = F.softmax(old_logits, dim=1).gather(1, actions)
             old_log_probs = torch.log(old_probs + 1e-8).detach()
-            for _ in range(self.config['epochs']):
+            for _ in range(self.config.epochs):
                 logits, values = model(states)
                 action_dist = torch.distributions.Categorical(logits=logits)
                 probs = F.softmax(logits, dim=1).gather(1, actions)
@@ -164,14 +177,14 @@ class Learner(Process):
                 ratio = torch.exp(log_probs - old_log_probs)
                 surr1 = ratio * advs
                 surr2 = torch.clamp(
-                    ratio, 1 - self.config['clip'], 1 + self.config['clip']) * advs
+                    ratio, 1 - self.config.clip, 1 + self.config.clip) * advs
                 policy_loss = -torch.mean(torch.min(surr1, surr2))
                 value_loss = torch.mean(
                     F.mse_loss(values.squeeze(-1), targets))
                 entropy_loss = -torch.mean(action_dist.entropy())
                 loss = policy_loss + \
-                    self.config['value_coeff'] * value_loss + \
-                    self.config['entropy_coeff'] * entropy_loss
+                    self.config.value_coeff * value_loss + \
+                    self.config.entropy_coeff * entropy_loss
 
                 self.total_loss += loss.item()
                 self.policy_loss += policy_loss.item()
@@ -184,35 +197,38 @@ class Learner(Process):
                 loss.backward()
                 optimizer.step()
 
-            if iterations % self.config['log_interval'] == 0:
-                self.log_metrics(iterations)
-
             # push new model
             model = model.to('cpu')
             # push cpu-only tensor to model_pool
             model_pool.push(model.state_dict())
             model = model.to(device)
 
-            # eval and save checkpoints
+            # logging, evaluation and save checkpoints
 
-            if iterations % self.config['ckpt_save_interval'] == 0:
-                print("saving and evaluating")
-                path = os.path.join(self.model_dir, 'model_%d.pt' % iterations)
+            iteration = self.get_iteration()
+            if iteration % self.config.log_interval == 0:
+                self.log_metrics(iteration)
+
+            if iteration % self.config.ckpt_save_interval == 0:
+                path = os.path.join(self.model_dir, 'model_%d.pt' % iteration)
                 torch.save(model.state_dict(), path)
-            if iterations % self.config['eval_interval'] == 0:
+
+            if iteration % self.config.eval_interval == 0:
                 model = model.to('cpu')
                 avg_episode_length, has_winner_percentage, no_winner_percentage, error_percentage = eval(
                     model, MahjongGBEnv(config={'agent_clz': FeatureAgent}))
 
                 self.writer.add_scalar(
-                    'Eval/avg_episode_length', avg_episode_length, iterations)
+                    'Eval/avg_episode_length', avg_episode_length, iteration)
                 self.writer.add_scalar(
-                    'Eval/win_rate', has_winner_percentage, iterations)
+                    'Eval/win_rate', has_winner_percentage, iteration)
                 self.writer.add_scalar(
-                    'Eval/no_winner_rate', no_winner_percentage, iterations)
+                    'Eval/no_winner_rate', no_winner_percentage, iteration)
                 self.writer.add_scalar(
-                    'Eval/error_rate', error_percentage, iterations)
+                    'Eval/error_rate', error_percentage, iteration)
 
                 model = model.to(device)
-            iterations += 1
+            with self.iteration.get_lock():
+                self.iteration.value += 1
+
         self.writer.close()
