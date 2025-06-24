@@ -161,9 +161,6 @@ class Learner(Process):
             advs = torch.tensor(batch['adv']).to(device)
             targets = torch.tensor(batch['target']).to(device)
 
-            # print('Iteration %d, replay buffer in %d out %d' % (
-            #     iterations, self.replay_buffer.stats['sample_in'], self.replay_buffer.stats['sample_out']))
-
             # calculate PPO loss
             model.train(True)  # Batch Norm training mode
             old_logits, _ = model(states)
@@ -208,6 +205,12 @@ class Learner(Process):
             iteration = self.get_iteration()
             if iteration % self.config.log_interval == 0:
                 self.log_metrics(iteration)
+                self.writer.add_scalar(
+                    'ReplayBuffer/sample_in', self.replay_buffer.stats['sample_in'], iteration)
+                self.writer.add_scalar(
+                    'ReplayBuffer/sample_out', self.replay_buffer.stats['sample_out'], iteration)
+                self.writer.add_scalar(
+                    'ReplayBuffer/size', self.replay_buffer.size(), iteration)
 
             if iteration % self.config.ckpt_save_interval == 0:
                 path = os.path.join(self.model_dir, 'model_%d.pt' % iteration)

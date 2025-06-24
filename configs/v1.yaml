@@ -1,4 +1,4 @@
-num_actors: 1
+num_actors: 5
 
 replay_buffer_size: 100000
 replay_buffer_episode: 1000
@@ -12,15 +12,15 @@ min_sample: 1000
 batch_size: 256
 epochs: 5
 clip: 0.2
-lr: 0.0003
+lr: 0.00001
 value_coeff: 0.5
-entropy_coeff: 0.01
+entropy_coeff: 0.1
 device: "cuda"
 max_iterations: 1000000
 
-log_interval: 1000
+log_interval: 10
 ckpt_save_interval: 100000
-eval_interval: 50000
+eval_interval: 1000
 output_path: "./output"
 
 use_curriculum: True

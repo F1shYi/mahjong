@@ -25,7 +25,7 @@ class Actor(Process):
         self.config = config
         self.actor_id = actor_id
         self.learner = learner  # Need to know the global training iteration
-
+        print(f"Actor {self.actor_id} initialized")
         # slicing
         if self.config.use_curriculum and full_shanten_tilewalls:
             self.shanten_tilewalls: List[List[str]] = []
@@ -39,6 +39,9 @@ class Actor(Process):
                     shanten_tilewalls[start_idx:end_idx])
             self.current_shanten = 0
             self.shanten_tilewalls_idx = 0
+            for shanten_num, shanten_tilewalls in enumerate(self.shanten_tilewalls):
+                print(
+                    f"Actor {self.actor_id} using {shanten_num} shanten data, length = {len(shanten_tilewalls)}")
 
     def get_tilewalls(self) -> str:
         if self.config.use_curriculum == False:
@@ -47,8 +50,12 @@ class Actor(Process):
         if current_iteration >= self.config.curriculum_iterations[self.current_shanten]:
             self.current_shanten += 1
             self.shanten_tilewalls_idx = 0
+            print(
+                f"Actor {self.actor_id} switch to {self.current_shanten} shanten data")
         tilewall = self.shanten_tilewalls[self.current_shanten][self.shanten_tilewalls_idx]
         self.shanten_tilewalls_idx += 1
+        self.shanten_tilewalls_idx = self.shanten_tilewalls_idx % len(
+            self.shanten_tilewalls[self.current_shanten])
         return tilewall
 
     def run(self):
