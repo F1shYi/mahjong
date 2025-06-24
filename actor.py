@@ -52,6 +52,8 @@ class Actor(Process):
             self.shanten_tilewalls_idx = 0
             print(
                 f"Actor {self.actor_id} switch to {self.current_shanten} shanten data")
+        if self.current_shanten >= len(self.config.curriculum_iterations):
+            return ''
         tilewall = self.shanten_tilewalls[self.current_shanten][self.shanten_tilewalls_idx]
         self.shanten_tilewalls_idx += 1
         self.shanten_tilewalls_idx = self.shanten_tilewalls_idx % len(
