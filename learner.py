@@ -11,6 +11,8 @@ from env import ERROR, HASWINNER, NOWINNER, MahjongGBEnv
 from feature import FeatureAgent
 from torch.utils.tensorboard.writer import SummaryWriter
 from config import Config
+import ctypes
+from multiprocessing import Value
 
 
 def eval_one_episode(model: CNNModel, env: MahjongGBEnv):
@@ -82,12 +84,19 @@ class Learner(Process):
         self.setup_output_dirs()
         self.reset_metrics()
 
-        from multiprocessing import Value
         self.iteration = Value('i', 0)
+        self.BC_ongoing = Value(ctypes.c_bool, config.use_BC)
+        self.set_BC_ongoing(self.config.use_BC)
 
     def get_iteration(self):
         with self.iteration.get_lock():
             return self.iteration.value
+
+    def get_BC_ongoing(self):
+        return self.BC_ongoing.value
+
+    def set_BC_ongoing(self, val: bool):
+        self.BC_ongoing.value = val
 
     def setup_output_dirs(self):
         self.output_dir = self.config.output_path
@@ -125,6 +134,74 @@ class Learner(Process):
                 'PPO/mean_ratio', self.mean_ratio / self.count, iteration)
         self.reset_metrics()
 
+    def _behaviour_cloning(self, model, optimizer, model_pool):
+
+        # initialize model params
+        device = torch.device(self.config.device)
+        model.train(True)  # Batch Norm training mode
+        running_loss = []
+        while self.get_iteration() < self.config.BC_iterations:
+            # sample batch
+            batch = self.replay_buffer.sample(self.config.batch_size)
+            obs = torch.tensor(batch['state']['observation']).to(device)
+            mask = torch.tensor(batch['state']['action_mask']).to(device)
+            states = {
+                'observation': obs,
+                'action_mask': mask
+            }
+            actions = torch.tensor(batch['action']).unsqueeze(-1).to(device)
+            logits, _ = model(states)
+            loss = F.cross_entropy(logits, actions.squeeze(-1))
+            running_loss.append(loss.item())
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # push new model
+            model = model.to('cpu')
+            # push cpu-only tensor to model_pool
+            model_pool.push(model.state_dict())
+            model = model.to(device)
+            iteration = self.get_iteration()
+            if iteration % self.config.log_interval == 0:
+                self.writer.add_scalar(
+                    'BC/CELoss', np.mean(running_loss), iteration)
+                running_loss = []
+                self.writer.add_scalar(
+                    'ReplayBufferBC/sample_in', self.replay_buffer.stats['sample_in'], iteration)
+                self.writer.add_scalar(
+                    'ReplayBufferBC/sample_out', self.replay_buffer.stats['sample_out'], iteration)
+                self.writer.add_scalar(
+                    'ReplayBufferBC/size', self.replay_buffer.size(), iteration)
+
+            if iteration % self.config.ckpt_save_interval == 0:
+                path = os.path.join(
+                    self.model_dir, 'BC_model_%d.pt' % iteration)
+                torch.save(model.state_dict(), path)
+
+            if iteration % self.config.eval_interval == 0:
+                model = model.to('cpu')
+                avg_episode_length, has_winner_percentage, no_winner_percentage, error_percentage = eval(
+                    model, MahjongGBEnv(config={'agent_clz': FeatureAgent}))
+
+                self.writer.add_scalar(
+                    'BCEval/avg_episode_length', avg_episode_length, iteration)
+                self.writer.add_scalar(
+                    'BCEval/win_rate', has_winner_percentage, iteration)
+                self.writer.add_scalar(
+                    'BCEval/no_winner_rate', no_winner_percentage, iteration)
+                self.writer.add_scalar(
+                    'BCEval/error_rate', error_percentage, iteration)
+
+                model = model.to(device)
+            with self.iteration.get_lock():
+                self.iteration.value += 1
+
+        with self.iteration.get_lock():
+            self.iteration.value = 0
+        self.set_BC_ongoing(False)
+        self.replay_buffer.clear()
+
     def run(self):
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
@@ -148,7 +225,23 @@ class Learner(Process):
         while self.replay_buffer.size() < self.config.min_sample:
             time.sleep(0.1)
 
+        if self.config.use_BC:
+            print(f"[Learner] Current iteration = {self.get_iteration()}")
+            print(
+                f"[Learner] Entering Behaviour Cloning phase: BC_iterations = {self.config.BC_iterations}")
+            self._behaviour_cloning(model, optimizer, model_pool)
+
+            print("[Learner] Behaviour Cloning finished. Switching to PPO phase.")
+            while self.replay_buffer.size() < self.config.min_sample:
+                print("[Learner] Waiting for PPO samples...")
+                time.sleep(0.1)
+
+        print(f"[Learner] Current iteration = {self.get_iteration()}")
+        print(
+            f"[Learner] Entering PPO phase: max_iterations = {self.config.max_iterations}")
+
         while self.get_iteration() < self.config.max_iterations:
+
             # sample batch
             batch = self.replay_buffer.sample(self.config.batch_size)
             obs = torch.tensor(batch['state']['observation']).to(device)

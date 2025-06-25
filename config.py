@@ -40,3 +40,9 @@ class Config:
     # which is reset by i-shanten initial conditions for `curriculum_iterations[i]` iterations
     # else ignored.
     curriculum_iterations: List[int]
+
+    # Behaviour Cloning
+    use_BC: bool
+    BC_iterations: int
+    use_curriculum_for_BC: bool
+    curriculum_iterations_for_BC: List[int]

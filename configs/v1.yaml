@@ -1,7 +1,7 @@
-num_actors: 5
+num_actors: 2
 
-replay_buffer_size: 1024
-replay_buffer_episode: 256
+replay_buffer_size: 5000
+replay_buffer_episode: 500
 
 model_pool_size: 20
 model_pool_name: "model-pool"
@@ -9,12 +9,12 @@ model_pool_name: "model-pool"
 gamma: 0.98
 gae_lambda: 0.95
 min_sample: 1000
-batch_size: 256
-epochs: 5
-clip: 0.2
-lr: 0.0005
+batch_size: 64
+epochs: 10
+clip: 0.3
+lr: 0.001
 value_coeff: 0.5
-entropy_coeff: 0.2
+entropy_coeff: 0.3
 device: "cuda"
 max_iterations: 300000
 
@@ -32,3 +32,14 @@ curriculum_iterations:
   - 80000
   - 100000
   - 120000
+
+use_BC: True
+use_curriculum_for_BC: True
+BC_iterations: 50000
+curriculum_iterations_for_BC:
+  - 5000
+  - 10000
+  - 15000
+  - 20000
+  - 25000
+  - 30000
