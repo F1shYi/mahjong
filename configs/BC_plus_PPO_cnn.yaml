@@ -1,6 +1,6 @@
-num_actors: 4
+num_actors: 10
 
-replay_buffer_size: 80000
+replay_buffer_size: 100000
 replay_buffer_episode: 2000
 
 model_pool_size: 10
@@ -16,7 +16,7 @@ lr: 0.001
 value_coeff: 0.5
 entropy_coeff: 0.3
 device: "cuda"
-max_iterations: 100000
+max_iterations: 50000
 
 log_interval: 10
 ckpt_save_interval: 10000
@@ -26,16 +26,16 @@ output_path: "./output"
 use_curriculum: True
 curriculum_data_folder: "./curriculum_data"
 curriculum_iterations:
-  - 10000
-  - 20000
-  - 30000
+  - 8000
+  - 16000
+  - 24000
+  - 32000
   - 40000
-  - 50000
-  - 60000
+  - 48000
 
 use_BC: True
 use_curriculum_for_BC: True
-BC_iterations: 200000
+BC_iterations: 250000
 curriculum_iterations_for_BC:
   - 30000
   - 60000
