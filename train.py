@@ -36,7 +36,7 @@ def get_curriculum_data(config: Config):
 
 if __name__ == '__main__':
 
-    config = get_config("configs/v1.yaml")
+    config = get_config("configs/huge.yaml")
     full_shanten_tilewalls = get_curriculum_data(config)
 
     replay_buffer = ReplayBuffer(
