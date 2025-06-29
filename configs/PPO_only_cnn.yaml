@@ -5,6 +5,7 @@ replay_buffer_episode: 2000
 
 model_pool_size: 10
 model_pool_name: "model-pool"
+resume_fpath: "./output/20250628-233747/model/BC_model_160000.pt"
 
 gamma: 0.98
 gae_lambda: 0.95
@@ -26,12 +27,12 @@ output_path: "./output"
 use_curriculum: True
 curriculum_data_folder: "./curriculum_data"
 curriculum_iterations:
+  - 10000
+  - 20000
   - 30000
+  - 40000
+  - 50000
   - 60000
-  - 90000
-  - 120000
-  - 150000
-  - 180000
 
 use_BC: False
 use_curriculum_for_BC: False

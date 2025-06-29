@@ -212,6 +212,8 @@ class Learner(Process):
         # initialize model params
         device = torch.device(self.config.device)
         model = CNNModel()
+        if self.config.resume_fpath:
+            model.load_state_dict(torch.load(self.config.resume_fpath))
 
         # send to model pool
         # push cpu-only tensor to model_pool

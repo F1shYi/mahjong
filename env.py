@@ -1,5 +1,5 @@
 from agent import MahjongGBAgent
-
+import time
 import random
 from collections import defaultdict
 
@@ -45,6 +45,7 @@ class MahjongGBEnv():
         # Init random seed
         if self.variety > 0:
             random.seed(self.r.randint(0, self.variety - 1))
+        random.seed(time.time())
         # Init prevalent wind
         self.prevalentWind = random.randint(
             0, 3) if prevalentWind < 0 else prevalentWind

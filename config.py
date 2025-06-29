@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -25,6 +25,7 @@ class Config:
     entropy_coeff: float
     device: str
     max_iterations: int
+    resume_fpath: Optional[str]
 
     # measured by iterations
     log_interval: int
