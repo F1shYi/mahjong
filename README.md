@@ -2,35 +2,6 @@
 
 陈瑜 李泽铭 易小鱼
 
-## 更新日志
-
-### 0622
-增加了curriculum learning的数据。
-
-### 0620
-增加了测试代码，将训练到一半的模型进行若干次模拟对局，统计分出了赢家的对局，没分出赢家的对局，发生错误的对局，三者分别的占比。
-统计每局的长度，并求平均的对局长度（求的时候将发生错误的对局排除在外）。
-
-增加了logger，记录训练时的loss, PPO ratio; 每次保存模型的时候进行测试，并记录has winner rate, no winner rate, error rate和average episode length.
-
-将learner的计时方式由记录绝对的秒数改为记录训练的轮次iteration数，并每log_interval个iteration记录训练指标，每ckpt_save_interval个iteration保存模型，每eval_interval个iteration进行测试，记录测试指标。
-
-## 项目结构
-
-- `codebase/`文件夹
-  助教提供的代码库。
-- `src/`文件夹
-  我们自己写的源代码。按理说直接在`codebase/`的基础上开发就好，但是我怕改着改着改乱了，所以新建了一个文件夹来放我们自己的源代码。
-
-  
-## 当前进度
-
-- 2025-05-29
-  新建了文件夹。
-- 2025-06-04 TODOs
-  1. 理解`codebase/`的所有代码
-  2. 理解与botzone的交互逻辑。
-  3. 知道应该修改哪里。
 
 ## 环境配置
 
@@ -38,6 +9,7 @@
 conda create -n mahjong python=3.8
 conda activate mahjong
 pip install PyMahjongGB # 麻将算番库
+pip install tensorboard pyyaml tqdm
 
 # torch 1.8.0 linux and windows
 conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 cudatoolkit=11.1 -c pytorch -c conda-forge 
@@ -45,11 +17,43 @@ conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 cudatoolkit=11
 conda install pytorch==1.8.0 torchvision==0.9.0 torchaudio==0.8.0 -c pytorch
 ```
 
-配置好环境后，在`codebase/`文件夹下运行`python train.py`，即可开始训练。
+## 运行与测试
 
-如果出现`页面文件太小`的报错，可以试着在`train.py`的`config`里把`num_actors`调小，或参考[这个url](https://blog.csdn.net/weixin_46133643/article/details/125042903).
+配置好环境后，运行`python train.py`，即可开始训练。
 
-## 代码库介绍
+你可以在`python train.py`的`config`路径里修改使用什么配置进行训练。所有的配置文件都在`configs/`文件夹下。里面不同的设定包括是否使用behaviour cloning进行预训练，是否使用课程学习的数据，以及如果使用课程学习的数据，不同向听的数据使用多少个iteration。
+
+如果出现`页面文件太小`的报错，可以试着在`configs/[the config you are using].yaml`里把`num_actors`调小，或参考[这个url](https://blog.csdn.net/weixin_46133643/article/details/125042903).
+
+训练好后，checkpoint和log会自动保存到`output/`文件夹下。可以运行`python eval.py`来指定训好的某四个checkpoint进行模拟对战。
+
+
+## 更新日志
+
+### 0628
+
+增加了behaviour cloning阶段
+
+### 0622
+
+增加了curriculum learning的数据。
+
+### 0620
+
+增加了测试代码，将训练到一半的模型进行若干次模拟对局，统计分出了赢家的对局，没分出赢家的对局，发生错误的对局，三者分别的占比。
+统计每局的长度，并求平均的对局长度（求的时候将发生错误的对局排除在外）。
+
+增加了logger，记录训练时的loss, PPO ratio; 每次保存模型的时候进行测试，并记录has winner rate, no winner rate, error rate和average episode length.
+
+将learner的计时方式由记录绝对的秒数改为记录训练的轮次iteration数，并每log_interval个iteration记录训练指标，每ckpt_save_interval个iteration保存模型，每eval_interval个iteration进行测试，记录测试指标。
+
+
+### 0604
+
+理解了codebase的所有代码,与botzone的交互逻辑。
+
+
+## 代码库介绍（一些组内讨论，还没整理）
 
 ### 与botzone的交互逻辑和格式
 
